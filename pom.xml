@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>org.reactome.release</groupId>
@@ -7,11 +9,17 @@
 	<version>1.1.4-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
-	<name>chebi-update</name>
+	<name>${project.groupId}:${project.artifactId}</name>
 	<description>
 		Synchronization of gk_central Reference Molecule instances with ChEBI (https://www.ebi.ac.uk/chebi/)
 	</description>
 	<url>https://reactome.org</url>
+
+	<organization>
+		<name>Reactome</name>
+		<url>https://reactome.org</url>
+	</organization>
+
 	<licenses>
 		<license>
 			<name>GNU AFFERO GENERAL PUBLIC LICENSE</name>
@@ -23,8 +31,8 @@
 		<developer>
 			<name>Solomon Shorser</name>
 			<email>solomon.shorser@oicr.on.ca</email>
-			<organization>Reactome</organization>
-			<organizationUrl>https://reactome.org</organizationUrl>
+			<organization>Ontario Institute for Cancer Research</organization>
+			<organizationUrl>https://oicr.on.ca</organizationUrl>
 		</developer>
 	</developers>
 
@@ -35,11 +43,44 @@
 		<tag>develop</tag>
 	</scm>
 
+	<!-- Configures the distribution to nexus repository -->
+	<distributionManagement>
+		<!-- Sonatype Release repo -->
+		<repository>
+			<id>ossrh</id>
+			<name>Sonatype Release Repository</name>
+			<url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2</url>
+		</repository>
+
+		<!-- Sonatype SNAPSHOT repo -->
+		<snapshotRepository>
+			<id>ossrh</id>
+			<name>Sonatype Snapshot Repository</name>
+			<url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
+		</snapshotRepository>
+	</distributionManagement>
+
 	<properties>
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<jdk.version>11</jdk.version>
+		<!-- dependencies -->
+		<chebiws.client.version>2.4</chebiws.client.version>
 		<mockito.version>2.18.3</mockito.version>
+		<junit.version>4.12</junit.version>
 		<powermock.version>2.0.0</powermock.version>
+		<reactome.release.common.lib.version>2.0.0-SNAPSHOT</reactome.release.common.lib.version>
+
+		<!-- build -->
+		<jdk.version>1.8</jdk.version>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+		<!-- maven build and plugins -->
+		<maven.assembly.version>3.2.0</maven.assembly.version>
+		<maven.compiler.version>3.8.1</maven.compiler.version>
+		<maven.gpg.version>1.5</maven.gpg.version>
+		<maven.javadoc.version>2.10.3</maven.javadoc.version>
+		<maven.release.version>2.5.3</maven.release.version>
+		<maven.source.version>2.4</maven.source.version>
+		<nexus-staging-maven-plugin>1.6.7</nexus-staging-maven-plugin>
+		<maven.tidy.version>1.1.0</maven.tidy.version>
 	</properties>
 
 	<dependencies>
@@ -47,54 +88,45 @@
 		<dependency>
 			<groupId>uk.ac.ebi.chebi.webapps.chebiWS.client</groupId>
 			<artifactId>chebiWS-client</artifactId>
-			<version>2.4</version>
+			<version>${chebiws.client.version}</version>
 		</dependency>
 
-		<dependency>
-			<groupId>com.sun.xml.ws</groupId>
-			<artifactId>jaxws-ri</artifactId>
-			<version>2.3.3</version>
-			<type>pom</type>
-		</dependency>
-
-		<!-- https://mvnrepository.com/artifact/javax.xml.soap/javax.xml.soap-api -->
-		<dependency>
-			<groupId>javax.xml.soap</groupId>
-			<artifactId>javax.xml.soap-api</artifactId>
-			<version>1.4.0</version>
-		</dependency>
 
 		<dependency>
 			<groupId>org.reactome.release</groupId>
 			<artifactId>release-common-lib</artifactId>
-			<version>2.0.0-SNAPSHOT</version>
+			<version>${reactome.release.common.lib.version}</version>
 		</dependency>
 
 		<!-- Test dependencies -->
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
-			<version>4.13.2</version>
+			<version>${junit.version}</version>
 			<scope>test</scope>
 		</dependency>
+
 		<dependency>
 			<groupId>org.mockito</groupId>
 			<artifactId>mockito-core</artifactId>
 			<version>${mockito.version}</version>
 			<scope>test</scope>
 		</dependency>
+
 		<dependency>
 			<groupId>org.mockito</groupId>
 			<artifactId>mockito-junit-jupiter</artifactId>
 			<version>${mockito.version}</version>
 			<scope>test</scope>
 		</dependency>
+
 		<dependency>
 			<groupId>org.powermock</groupId>
 			<artifactId>powermock-api-mockito2</artifactId>
 			<version>${powermock.version}</version>
 			<scope>test</scope>
 		</dependency>
+
 		<dependency>
 			<groupId>org.powermock</groupId>
 			<artifactId>powermock-module-junit4</artifactId>
@@ -125,12 +157,13 @@
 	</repositories>
 
 	<build>
+		<finalName>${project.artifactId}</finalName>
 		<plugins>
 			<!-- sets the Java compiler version targeted by Maven -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.8.1</version>
+				<version>${maven.compiler.version}</version>
 				<configuration>
 					<source>${jdk.version}</source>
 					<target>${jdk.version}</target>
@@ -145,7 +178,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-assembly-plugin</artifactId>
-				<version>3.2.0</version>
+				<version>${maven.assembly.version}</version>
 				<configuration>
 					<archive>
 						<manifestEntries>
@@ -175,13 +208,73 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-release-plugin</artifactId>
-				<version>2.5.3</version>
+				<version>${maven.release.version}</version>
 				<configuration>
 					<autoVersionSubmodules>true</autoVersionSubmodules>
 					<useReleaseProfile>false</useReleaseProfile>
 					<releaseProfiles>release</releaseProfiles>
 					<goals>deploy</goals>
 					<tagNameFormat>v@{project.version}</tagNameFormat>
+				</configuration>
+			</plugin>
+
+			<!-- Generate source jar file -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-source-plugin</artifactId>
+				<version>${maven.source.version}</version>
+				<executions>
+					<execution>
+						<id>attach-sources</id>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- Generate JavaDoc jar file -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-javadoc-plugin</artifactId>
+				<version>${maven.javadoc.version}</version>
+				<executions>
+					<execution>
+						<id>attach-javadocs</id>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- Signs deployed jar, source jar, and JavaDoc jar with GPG -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-gpg-plugin</artifactId>
+				<version>${maven.gpg.version}</version>
+				<executions>
+					<execution>
+						<id>sign-artifacts</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>sign</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+
+			<!-- Nexus staging plugin for Sonatype deployment -->
+			<plugin>
+				<groupId>org.sonatype.plugins</groupId>
+				<artifactId>nexus-staging-maven-plugin</artifactId>
+				<version>${nexus-staging-maven-plugin}</version>
+				<extensions>true</extensions>
+				<configuration>
+					<serverId>ossrh</serverId>
+					<nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
+					<autoReleaseAfterClose>true</autoReleaseAfterClose>
 				</configuration>
 			</plugin>
 
@@ -192,7 +285,7 @@
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>tidy-maven-plugin</artifactId>
-				<version>1.1.0</version>
+				<version>${maven.tidy.version}</version>
 				<executions>
 					<execution>
 						<id>validate</id>
