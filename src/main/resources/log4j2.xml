@@ -30,7 +30,7 @@
 				<OnStartupTriggeringPolicy />
 			</Policies>
 		</RollingFile>
-		<RollingFile name="ReferenceEntityChanges" fileName="${baseDir}/ChEBI_Update_ReferenceEntityNameUpdates.tsv" filePattern="${archiveDir}/ChEBI_Update_ReferenceEntityNameUpdates-%d{yyyy-MM-dd_HH.mm.ss}.tsv.gz">
+		<RollingFile name="SimpleEntityInstanceChanges" fileName="${baseDir}/ChEBI_Update_SimpleEntityInstanceNameUpdates.tsv" filePattern="${archiveDir}/ChEBI_Update_SimpleEntityInstanceNameUpdates-%d{yyyy-MM-dd_HH.mm.ss}.tsv.gz">
 			<PatternLayout>
 				<Pattern>%msg%n</Pattern>
 			</PatternLayout>
