@@ -18,8 +18,6 @@ import org.gk.schema.InvalidAttributeException;
 import org.gk.schema.InvalidAttributeValueException;
 import org.reactome.release.common.database.InstanceEditUtils;
 
-import uk.ac.ebi.chebi.webapps.chebiWS.model.DataItem;
-import uk.ac.ebi.chebi.webapps.chebiWS.model.Entity;
 
 /**
  * Updates the ReferenceMolecules with new information from ChEBI.
@@ -94,7 +92,6 @@ public class ChebiUpdater {
 		logSimpleEntityInstanceChanges();
 	}
 
-
 	private void setupLogHeaders() {
 		refMolIdentChangeLog.info("# DB_ID\tCreator\tReference Molecule\tDeprecated Identifier\t" +
 			"Replacement Identifier\tAffected referenceEntity DB_IDs\t" +
@@ -126,20 +123,20 @@ public class ChebiUpdater {
 		}
 	}
 
-	private void processChEBIEntities(Map<GKInstance, Entity> entityMap, GKInstance instanceEdit) throws Exception {
+	private void processChEBIEntities(Map<GKInstance, ChebiEntity> entityMap, GKInstance instanceEdit) throws Exception {
 		logger.info("Number of entities we were able to retrieve information about: {}", entityMap.size());
 
-		for (Map.Entry<GKInstance, Entity> entry : entityMap.entrySet()) {
+		for (Map.Entry<GKInstance, ChebiEntity> entry : entityMap.entrySet()) {
 			GKInstance referenceMolecule = entry.getKey();
-			Entity entity = entry.getValue();
+			ChebiEntity entity = entry.getValue();
 			processEntity(referenceMolecule, entity, instanceEdit);
 		}
 	}
 
-	private void processEntity(GKInstance referenceMolecule, Entity entity, GKInstance instanceEdit) throws Exception {
-		String chebiID = entity.getChebiId().replaceAll("CHEBI:", "");
-		String chebiName = entity.getChebiAsciiName();
-		List<DataItem> chebiFormulae = entity.getFormulae();
+	private void processEntity(GKInstance referenceMolecule, ChebiEntity entity, GKInstance instanceEdit) throws Exception {
+		String chebiID = entity.getChebiID().replaceAll("CHEBI:", "");
+		String chebiName = entity.getName();
+		String chebiFormulae = entity.getFormula();
 
 		logIfReferenceMoleculeIdentifierChanged(referenceMolecule, chebiID);
 
@@ -248,15 +245,15 @@ public class ChebiUpdater {
 			.sorted(this.personComparator).collect(Collectors.toList());
 	}
 
-	private boolean updateMoleculeFormula(GKInstance molecule, List<DataItem> chebiFormulae) throws Exception {
+	private boolean updateMoleculeFormula(GKInstance molecule, String chebiFormula) throws Exception {
 
-		if (chebiFormulae.isEmpty()) {
+		if (chebiFormula.isEmpty()) {
 			return false;
 		}
 
 		String moleculeFormula = (String) molecule.getAttributeValue(ReactomeJavaConstants.formula);
 		String moleculeIdentifier = (String) molecule.getAttributeValue(ReactomeJavaConstants.identifier);
-		String firstFormula = chebiFormulae.get(0).getData();
+		String firstFormula = chebiFormula;
 
 		String reportLinePrefix = String.format(
 				"ReferenceMolecule (DB ID: %d / ChEBI ID: %s) has changes: ",
