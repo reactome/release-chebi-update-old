@@ -1,16 +1,17 @@
 package org.reactome.release.chebiupdate;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.*;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.gk.model.GKInstance;
 import org.gk.model.ReactomeJavaConstants;
-
-import uk.ac.ebi.chebi.webapps.chebiWS.client.ChebiWebServiceClient;
-import uk.ac.ebi.chebi.webapps.chebiWS.model.ChebiWebServiceFault_Exception;
-import uk.ac.ebi.chebi.webapps.chebiWS.model.Entity;
+import org.json.JSONObject;
 
 /**
  * An instance of this class can be used to retrieve data from ChEBI.
@@ -18,10 +19,6 @@ import uk.ac.ebi.chebi.webapps.chebiWS.model.Entity;
  *
  */
 class ChebiDataRetriever {
-	// Optional TODO: Make this user-configurable. Not really a high priority, but might prove useful some day in the
-	// 			distant future...
-	private ChebiWebServiceClient chebiClient = new ChebiWebServiceClient();
-	
 	private static final Logger logger = LogManager.getLogger();
 
 	private ChebiCache chebiCache;
@@ -52,16 +49,61 @@ class ChebiDataRetriever {
 				continue;
 			}
 
-			Entity entity = getEntity(referenceMolecule);
+			ChebiEntity entity = getEntity(referenceMolecule);
 
 			if (entity != null) {
 				chebiData.addEntity(referenceMolecule, entity);
-			} else {
-				chebiData.addFailedEntity(referenceMolecule, "ChEBI WebService response was NULL.");
 			}
 		}
 
 		return chebiData;
+	}
+
+	ChebiEntity getCompleteEntity(String identifier) throws Exception {
+		if (identifier.isEmpty()) {
+			throw new IllegalStateException("identifier is empty");
+		}
+
+		String restURL = "https://www.ebi.ac.uk/chebi/backend/api/public/compound/" + identifier;
+
+		HttpClient client = HttpClient.newBuilder()
+			.followRedirects(HttpClient.Redirect.ALWAYS)
+			.build();
+
+		HttpRequest request = HttpRequest.newBuilder()
+			.uri(URI.create(restURL))
+			.GET()
+			.build();
+
+		HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+		JSONObject chEBIJSON = new JSONObject(response.body());
+
+		System.out.println(chEBIJSON);
+		if (noCompoundMatches(chEBIJSON)) {
+			throw new NoCompoundMatchesException("No compound matches found for identifier: " + identifier);
+		}
+
+		String chebiID = chEBIJSON.getString("chebi_accession");
+		String name = chEBIJSON.getString("ascii_name");
+		String formula = getFormula(chEBIJSON);
+		return new ChebiEntity(chebiID, name, formula);
+	}
+
+	private static boolean noCompoundMatches(JSONObject chEBIJSON) {
+		if (chEBIJSON.has("detail")) {
+			return chEBIJSON.getString("detail").contains("No Compound matches");
+		}
+
+		return false;
+	}
+
+	private String getFormula(JSONObject chEBIJSON) {
+		if (chEBIJSON.isNull("chemical_data") ||
+				chEBIJSON.getJSONObject("chemical_data").isNull("formula")) {
+			return "";
+		}
+
+		return chEBIJSON.getJSONObject("chemical_data").getString("formula");
 	}
 
 	private String getIdentifier(GKInstance molecule) throws Exception {
@@ -74,8 +116,8 @@ class ChebiDataRetriever {
 		return identifier;
 	}
 
-	private Entity getEntity(GKInstance referenceMolecule) throws Exception {
-		Entity entity = getEntityFromCacheIfEnabled(referenceMolecule);
+	private ChebiEntity getEntity(GKInstance referenceMolecule) throws Exception {
+		ChebiEntity entity = getEntityFromCacheIfEnabled(referenceMolecule);
 
 		if (entity == null) {
 			entity = getChEBIDataFromWebService(referenceMolecule);
@@ -83,45 +125,12 @@ class ChebiDataRetriever {
 		return entity;
 	}
 
-	private Entity getEntityFromCacheIfEnabled(GKInstance referenceMolecule) throws Exception {
+	private ChebiEntity getEntityFromCacheIfEnabled(GKInstance referenceMolecule) throws Exception {
 		if (!getChEBICache().isEnabled()) {
 			return null;
 		}
 
 		return getChEBICache().extractChEBIEntityFromCache(getIdentifier(referenceMolecule));
-	}
-
-	/**
-	 * Handles exceptions from the ChEBI web service. Some of them are ok, as in "invalid ChEBI identifier",
-	 * and "entity is deleted, obsolete, not released", but anything else
-	 * will cause a runtime exception to be thrown. It's probably not safe to continue with unrecognized exceptions.
-	 * IF you encounter *new* exceptions that are not listed here but are not too serious, feel free to update this
-	 * code to write the appropriate message for those exceptions, rather than failing with a RuntimeException.
-	 * @param molecule
-	 * @param e
-	 */
-	private void handleWSException(GKInstance molecule, ChebiWebServiceFault_Exception e) throws Exception {
-		String identifier = getIdentifier(molecule);
-		// "invalid ChEBI identifier" probably shouldn't break execution but should be logged for further investigation.
-		if (e.getMessage().contains("invalid ChEBI identifier")) {
-			String errMsg = "ChEBI Identifier \"" + identifier + "\" is not formatted correctly.";
-			logger.error(errMsg);
-		}
-		// Log this identifier but don't fail.
-		else if (e.getMessage().contains("the entity in question is deleted, obsolete, or not yet released"))
-		{
-			String errMsg = "ChEBI Identifier \"" + identifier + "\" is deleted, obsolete, or not yet released.";
-			logger.error(errMsg);
-		}
-		else
-		{
-			// Other Webservice errors should probably break execution - if one fails, they will all probably fail.
-			// This is *not* a general principle, but is based on my experience with the ChEBI webservice specifically -
-			// it's a pretty stable service, so it's unlikely that if one service call fails, the others will succeed.
-			logger.error("WebService error occurred! Message is: {}", e.getMessage());
-			e.printStackTrace();
-			throw new RuntimeException(e);
-		}
 	}
 
 	/**
@@ -131,20 +140,18 @@ class ChebiDataRetriever {
 	 * @throws IOException
 	 * @throws Exception
 	 */
-	private Entity getChEBIDataFromWebService(GKInstance referenceMolecule) throws IOException, Exception {
+	private ChebiEntity getChEBIDataFromWebService(GKInstance referenceMolecule) throws IOException, Exception {
 
-		Entity entity;
+		ChebiEntity entity;
 		try {
-			entity = this.chebiClient.getCompleteEntity(getIdentifier(referenceMolecule));
-		} catch (ChebiWebServiceFault_Exception e) {
-			handleWSException(referenceMolecule, e);
-			chebiData.addFailedEntity(
-				referenceMolecule, "ChEBI Identifier " + getIdentifier(referenceMolecule) + ": " + e.getMessage()
-			);
-			entity = null;
+			entity = getCompleteEntity(getIdentifier(referenceMolecule));
+		} catch (NoCompoundMatchesException e) {
+			chebiData.addFailedEntity(referenceMolecule, e.getMessage());
+			return null;
 		}
+
 		// IF there is a valid entity AND we are supposed to use a cache, then write the entity to the cache file.
-		if (entity != null && getChEBICache().isEnabled()) {
+		if (getChEBICache().isEnabled()) {
 			getChEBICache().writeToCacheFile(getIdentifier(referenceMolecule), entity);
 		}
 
@@ -155,8 +162,8 @@ class ChebiDataRetriever {
 		return this.chebiCache;
 	}
 
-	public class ChEBIData {
-		private Map<GKInstance, Entity> entityMap;
+	public static class ChEBIData {
+		private Map<GKInstance, ChebiEntity> entityMap;
 		private Map<GKInstance, String> failedEntitiesMap;
 
 		public ChEBIData() {
@@ -164,7 +171,7 @@ class ChebiDataRetriever {
 			this.failedEntitiesMap = new HashMap<>();
 		}
 
-		public Map<GKInstance, Entity> getEntityMap() {
+		public Map<GKInstance, ChebiEntity> getEntityMap() {
 			return this.entityMap;
 		}
 
@@ -172,14 +179,18 @@ class ChebiDataRetriever {
 			return this.failedEntitiesMap;
 		}
 
-		public void addEntity(GKInstance referenceMolecule, Entity entity) {
+		public void addEntity(GKInstance referenceMolecule, ChebiEntity entity) {
 			this.entityMap.put(referenceMolecule, entity);
 		}
 
 		public void addFailedEntity(GKInstance referenceMolecule, String errorMessage) {
 			this.failedEntitiesMap.put(referenceMolecule, errorMessage);
 		}
+	}
 
-
+	public static class NoCompoundMatchesException extends Exception {
+		public NoCompoundMatchesException(String message) {
+			super(message);
+		}
 	}
 }
