@@ -36,7 +36,6 @@ public class ChebiUpdater {
 	private boolean testMode;
 	private MySQLAdaptor adaptor;
 	private long personID;
-	private boolean useCache;
 	private Comparator<GKInstance> personComparator;
 
 	private StringBuilder formulaUpdateSB = new StringBuilder();
@@ -49,14 +48,11 @@ public class ChebiUpdater {
 	 * @param testMode - Set testMode to TRUE if you want to perform a dry-run. Set to FALSE if you actually want to
 	 *                   commit to the database.
 	 * @param personID - The DB_ID of the Person whom the InstanceEdits will be associated with.
-	 * @param useCache - Set to TRUE to use the cache: If there's a file, load it. If there's no file, write one.
-	 *                   If FALSE, the cache file will not be read, and it will not be written.
 	 */
-	public ChebiUpdater(MySQLAdaptor adaptor, boolean testMode, long personID, boolean useCache) {
+	public ChebiUpdater(MySQLAdaptor adaptor, boolean testMode, long personID) {
 		this.adaptor = adaptor;
 		this.testMode = testMode;
 		this.personID = personID;
-		this.useCache = useCache;
 
 		// A Comparator object that will compare GKInstances, assuming that they are of the "Person" type,
 		// with a surname and firstname.
@@ -81,7 +77,7 @@ public class ChebiUpdater {
 		List<GKInstance> referenceMoleculeInstances = getReferenceMoleculeInstances(getChEBIReferenceDatabaseOrThrow());
 		logger.info("{} ChEBI ReferenceMolecules to check...", referenceMoleculeInstances.size());
 
-		ChebiDataRetriever dataRetriever = new ChebiDataRetriever(this.useCache);
+		ChebiDataRetriever dataRetriever = new ChebiDataRetriever();
 		ChebiDataRetriever.ChEBIData chEBIData = dataRetriever.retrieveUpdatesFromChebi(referenceMoleculeInstances);
 
 		logFailedEntities(chEBIData.getFailedEntitiesMap());
