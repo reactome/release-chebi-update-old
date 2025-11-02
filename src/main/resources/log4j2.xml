@@ -68,7 +68,7 @@
 			<AppenderRef ref="MoleculeIdentifierChanges"/>
 		</Logger>
 		<Logger name="refEntChangeLog" level="info" additivity="false">
-			<AppenderRef ref="ReferenceEntityChanges"/>
+			<AppenderRef ref="SimpleEntityInstanceChanges"/>
 		</Logger>
 		<Logger name="duplicatesLog" level="info" additivity="false">
 			<AppenderRef ref="DuplicateMolecules"/>
