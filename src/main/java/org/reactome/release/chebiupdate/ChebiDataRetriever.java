@@ -3,6 +3,7 @@ package org.reactome.release.chebiupdate;
 import java.io.IOException;
 import java.util.*;
 
+import com.google.common.collect.Lists;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.gk.model.GKInstance;
@@ -34,29 +35,46 @@ class ChebiDataRetriever {
 	 * @return A ReferenceMolecule DB_ID-to-ChEBI Entity map.
 	 * @throws IOException 
 	 */
-	public ChEBIData retrieveUpdatesFromChebi(Collection<GKInstance> referenceMolecules) throws Exception {
+	public ChEBIData retrieveUpdatesFromChebi(List<GKInstance> referenceMolecules) throws Exception {
 		ChEBIEntityRetriever chEBIEntityRetriever = new ChEBIEntityRetriever();
-		Map<GKInstance, Optional<ChebiEntity>> referenceMolecule2ChebiEntity
-			= chEBIEntityRetriever.getChEBIEntities(new ArrayList<>(referenceMolecules));
 
-		for (GKInstance referenceMolecule : referenceMolecules) {
-			String identifier = getIdentifier(referenceMolecule);
-			if (identifier.isEmpty()) {
-				chebiData.addFailedEntity(referenceMolecule, "ChEBI Identifier is empty.");
-				continue;
+		final int batchSize = 500;
+		int processedCount = 0;
+		for (List<GKInstance> referenceMoleculeBatch : getReferenceMoleculeBatches(referenceMolecules, batchSize)) {
+
+			Map<GKInstance, Optional<ChebiEntity>> referenceMolecule2ChebiEntity
+				= chEBIEntityRetriever.getChEBIEntities(new ArrayList<>(referenceMoleculeBatch));
+
+			for (GKInstance referenceMolecule : referenceMoleculeBatch) {
+				String identifier = getIdentifier(referenceMolecule);
+				if (identifier.isEmpty()) {
+					chebiData.addFailedEntity(referenceMolecule, "ChEBI Identifier is empty.");
+					continue;
+				}
+
+				Optional<ChebiEntity> entity = referenceMolecule2ChebiEntity.get(referenceMolecule);
+
+				if (entity != null && entity.isPresent()) {
+					chebiData.addEntity(referenceMolecule, entity.get());
+				} else {
+					chebiData.addFailedEntity(referenceMolecule, "No ChEBI Entity found for " + identifier);
+				}
+
 			}
 
-			Optional<ChebiEntity> entity = referenceMolecule2ChebiEntity.get(referenceMolecule);
-
-			if (entity != null && entity.isPresent()) {
-				chebiData.addEntity(referenceMolecule, entity.get());
-			} else {
-				chebiData.addFailedEntity(referenceMolecule, "No ChEBI Entity found for " + identifier);
-			}
+			processedCount += referenceMoleculeBatch.size();
+			logger.info("Finished processing " + processedCount + " reference molecules");
 		}
 
 		return chebiData;
 	}
+
+	private List<List<GKInstance>> getReferenceMoleculeBatches(
+			List<GKInstance> referenceMolecules, int batchSize) {
+
+		return Lists.partition(referenceMolecules, batchSize);
+	}
+
 
 	private String getIdentifier(GKInstance molecule) throws Exception {
 		String identifier = (String) molecule.getAttributeValue(ReactomeJavaConstants.identifier);
