@@ -1,5 +1,7 @@
 # ChEBI Update
 
+NOTE: This repository is deprecated - please use https://github.com/reactome/release-chebi-update. 
+
 This tool will perform the ChEBI update.
 
 It will:
